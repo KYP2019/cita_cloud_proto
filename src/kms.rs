@@ -1,17 +1,16 @@
-// crypt_type:
-// 0: mock for test
-// 1: secp256k1 + keccak
-// 2: sm2 + sm3
-
-// key_id index of the key in kms
-// reverse 0/1/2 .. 256 for each crypt_type
-// For cases without key_id, for example:
-// calc tx_hash of UnverifiedTransaction or other only need hash data
-
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetCryptoInfoResponse {
+    #[prost(string, tag = "1")]
+    pub name: std::string::String,
+    #[prost(uint32, tag = "2")]
+    pub hash_len: u32,
+    #[prost(uint32, tag = "3")]
+    pub signature_len: u32,
+    #[prost(uint32, tag = "4")]
+    pub address_len: u32,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GenerateKeyPairRequest {
-    #[prost(uint32, tag = "1")]
-    pub crypt_type: u32,
     #[prost(string, tag = "2")]
     pub description: std::string::String,
 }
@@ -24,8 +23,6 @@ pub struct GenerateKeyPairResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HashDataRequest {
-    #[prost(uint64, tag = "1")]
-    pub key_id: u64,
     #[prost(bytes, tag = "2")]
     pub data: std::vec::Vec<u8>,
 }
@@ -97,6 +94,21 @@ pub mod kms_service_client {
         pub fn with_interceptor(inner: T, interceptor: impl Into<tonic::Interceptor>) -> Self {
             let inner = tonic::client::Grpc::with_interceptor(inner, interceptor);
             Self { inner }
+        }
+        #[doc = " Get crypto info"]
+        pub async fn get_crypto_info(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::common::Empty>,
+        ) -> Result<tonic::Response<super::GetCryptoInfoResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/kms.KmsService/GetCryptoInfo");
+            self.inner.unary(request.into_request(), path, codec).await
         }
         #[doc = " Generate a KeyPair"]
         pub async fn generate_key_pair(
@@ -194,6 +206,11 @@ pub mod kms_service_server {
     #[doc = "Generated trait containing gRPC methods that should be implemented for use with KmsServiceServer."]
     #[async_trait]
     pub trait KmsService: Send + Sync + 'static {
+        #[doc = " Get crypto info"]
+        async fn get_crypto_info(
+            &self,
+            request: tonic::Request<super::super::common::Empty>,
+        ) -> Result<tonic::Response<super::GetCryptoInfoResponse>, tonic::Status>;
         #[doc = " Generate a KeyPair"]
         async fn generate_key_pair(
             &self,
@@ -253,6 +270,39 @@ pub mod kms_service_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
+                "/kms.KmsService/GetCryptoInfo" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetCryptoInfoSvc<T: KmsService>(pub Arc<T>);
+                    impl<T: KmsService> tonic::server::UnaryService<super::super::common::Empty>
+                        for GetCryptoInfoSvc<T>
+                    {
+                        type Response = super::GetCryptoInfoResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::common::Empty>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { inner.get_crypto_info(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let interceptor = inner.1.clone();
+                        let inner = inner.0;
+                        let method = GetCryptoInfoSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = if let Some(interceptor) = interceptor {
+                            tonic::server::Grpc::with_interceptor(codec, interceptor)
+                        } else {
+                            tonic::server::Grpc::new(codec)
+                        };
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/kms.KmsService/GenerateKeyPair" => {
                     #[allow(non_camel_case_types)]
                     struct GenerateKeyPairSvc<T: KmsService>(pub Arc<T>);
